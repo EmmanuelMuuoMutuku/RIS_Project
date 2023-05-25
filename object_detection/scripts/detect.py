@@ -86,7 +86,7 @@ def detect(opt, save_img=False):
         # Detection process
         # detections per image
         for i, det in enumerate(pred):  
-            p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
+            p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 1)
             
             # normalization gain 
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  
@@ -99,5 +99,6 @@ def detect(opt, save_img=False):
                 for *xyxy, conf, cls in reversed(det):
                     label = f'{names[int(cls)]} {conf:.2f}'
                     plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
+                    print ("detected")
         
             return im0
