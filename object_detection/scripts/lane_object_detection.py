@@ -28,20 +28,20 @@ class Detector:
         
         
     # Object detection ====================
-    #img_save_path = "../content/test/frame_images/frame.jpg"
-    #if os.path.exists(img_save_path):
-    #    os.remove(img_save_path)
-    #    print("Ready for new frame")
-    #cv2.imwrite(img_save_path, processed_img)
+    img_save_path = "../content/test/frame_images/frame.jpg"
+    if os.path.exists(img_save_path):
+        os.remove(img_save_path)
+        print("Ready for new frame")
+    cv2.imwrite(img_save_path, processed_img)
 
-    #with torch.no_grad():
+    with torch.no_grad():
         # update all models (to fix SourceChangeWarning)
-     #   if opt.update:
-      #      for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
-       #         final_img = detect(opt)
-        #        strip_optimizer(opt.weights)
-        #else:
-         #   final_img = detect(opt)
+        if opt.update:
+            for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
+                final_img = detect(opt)
+                strip_optimizer(opt.weights)
+        else:
+            final_img = detect(opt)
     # ====================================
 
     def line_detection(self, image):
