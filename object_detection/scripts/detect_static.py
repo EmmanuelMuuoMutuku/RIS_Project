@@ -20,50 +20,70 @@ def detect(save_img=False):
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://'))
 
-    # Directories
-    save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
-    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    # Folders
+    # Run Incrementing
+    save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))
+    
+    # make folder in labels
+    (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  
 
     # Initialize
     set_logging()
     device = select_device(opt.device)
-    half = device.type != 'cpu'  # half precision only supported on CUDA
+    
+    # CUDA supports half precision
+    half = device.type != 'cpu'  
 
-    # Load model
-    model = attempt_load(weights, map_location=device)  # load FP32 model
-    stride = int(model.stride.max())  # model stride
-    imgsz = check_img_size(imgsz, s=stride)  # check img_size
+    # load FP32 model
+    model = attempt_load(weights, map_location=device)  
+    
+    # model stride
+    stride = int(model.stride.max())  
+    
+    # check image size
+    imgsz = check_img_size(imgsz, s=stride)  
     if half:
-        model.half()  # to FP16
+       
+        # to FP16
+        model.half()  
 
-    # Second-stage classifier
+    # Classify Second stage
     classify = False
     if classify:
-        modelc = load_classifier(name='resnet101', n=2)  # initialize
+        # initialize
+        modelc = load_classifier(name='resnet101', n=2)  
         modelc.load_state_dict(torch.load('weights/resnet101.pt', map_location=device)['model']).to(device).eval()
 
-    # Set Dataloader
+    # Setting the Dataloader
     vid_path, vid_writer = None, None
     if webcam:
         view_img = check_imshow()
-        cudnn.benchmark = True  # set True to speed up constant image size inference
+        
+        # set True to speed up constant image size inference
+        cudnn.benchmark = True  
         dataset = LoadStreams(source, img_size=imgsz, stride=stride)
     else:
         save_img = True
         dataset = LoadImages(source, img_size=imgsz, stride=stride)
 
-    # Get names and colors
+    # Obtain names and colors
     names = model.module.names if hasattr(model, 'module') else model.names
     colors = [[random.randint(0, 255) for _ in range(3)] for _ in names]
 
-    # Run inference
+    # Run
     if device.type != 'cpu':
-        model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
+        
+        # run once
+        model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  
     t0 = time.time()
     for path, img, im0s, vid_cap in dataset:
         img = torch.from_numpy(img).to(device)
-        img = img.half() if half else img.float()  # uint8 to fp16/32
-        img /= 255.0  # 0 - 255 to 0.0 - 1.0
+        
+         # uint8 to fp16/32
+        img = img.half() if half else img.float() 
+        
+        # range 0 - 255 to 0.0 - 1.0
+        img /= 255.0  
         if img.ndimension() == 3:
             img = img.unsqueeze(0)
 
@@ -71,44 +91,59 @@ def detect(save_img=False):
         t1 = time_synchronized()
         pred = model(img, augment=opt.augment)[0]
 
-        # Apply NMS
+        # NMS
         pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres, classes=opt.classes, agnostic=opt.agnostic_nms)
         t2 = time_synchronized()
 
-        # Apply Classifier
+        # Classifier
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
 
-        # Process detections
-        for i, det in enumerate(pred):  # detections per image
-            if webcam:  # batch_size >= 1
+        # Detection process
+        # detections per image
+        for i, det in enumerate(pred): 
+            
+            # batch_size >= 1
+            if webcam:  
                 p, s, im0, frame = path[i], '%g: ' % i, im0s[i].copy(), dataset.count
             else:
                 p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
 
-            p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # img.jpg
-            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
-            s += '%gx%g ' % img.shape[2:]  # print string
-            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
+            p = Path(p)  
+            
+             # img.jpg
+            save_path = str(save_dir / p.name) 
+            
+            # img.txt
+            txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}') 
+            # print
+            s += '%gx%g ' % img.shape[2:]  
+            # normalization gain whwh
+            gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
-                # Print results
+                # Print
                 for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
+                     # detections per class
+                    n = (det[:, -1] == c).sum() 
+                    # add to string
+                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  
 
-                # Write results
+                # results
                 for *xyxy, conf, cls in reversed(det):
-                    if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
+                    # Write to file
+                    if save_txt:  
+                        # normalized xywh
+                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  
+                         # label format
+                        line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh) 
                         with open(txt_path + '.txt', 'a') as f:
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
-                    if save_img or view_img:  # Add bbox to image
+                    # Add bbox to image
+                    if save_img or view_img:  
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=3)
 
@@ -118,19 +153,24 @@ def detect(save_img=False):
             # Stream results
             if view_img:
                 cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+                # 1 millisecond
+                cv2.waitKey(1)  
 
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == 'image':
                     cv2.imwrite(save_path, im0)
-                else:  # 'video'
-                    if vid_path != save_path:  # new video
+                    # 'video'
+                else:  
+                     # new video
+                    if vid_path != save_path: 
                         vid_path = save_path
                         if isinstance(vid_writer, cv2.VideoWriter):
-                            vid_writer.release()  # release previous video writer
-
-                        fourcc = 'mp4v'  # output video codec
+                             # release previous video writer
+                            vid_writer.release() 
+                            
+                        # output video codec
+                        fourcc = 'mp4v' 
                         fps = vid_cap.get(cv2.CAP_PROP_FPS)
                         w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
                         h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
