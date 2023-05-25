@@ -8,21 +8,41 @@ import numpy as np
 import rospy
 from sensor_msgs.msg import Image
 
-# Lane Detection
-from canny_func import region_of_interest, make_points, average, display_lines
-
-# Object Detectiob
+# Object Detection section
 import argparse
 import torch
 from detect import detect
 from utils.general import check_img_size, check_requirements, check_imshow, non_max_suppression, apply_classifier, \
     scale_coords, xyxy2xywh, strip_optimizer, set_logging, increment_path
 
+# Lane Detection section
+from canny_func import region_of_interest, make_points, average, display_lines
+
+
+
 
 class Detector:
     def __init__(self, opt):
         self.opt = opt
         self.pub = rospy.Publisher('/robotLA/camera_node/image/detected', Image, queue_size=10)
+        
+        
+    # Object detection ====================
+    #img_save_path = "../content/test/frame_images/frame.jpg"
+    #if os.path.exists(img_save_path):
+    #    os.remove(img_save_path)
+    #    print("Ready for new frame")
+    #cv2.imwrite(img_save_path, processed_img)
+
+    #with torch.no_grad():
+        # update all models (to fix SourceChangeWarning)
+     #   if opt.update:
+      #      for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
+       #         final_img = detect(opt)
+        #        strip_optimizer(opt.weights)
+        #else:
+         #   final_img = detect(opt)
+    # ====================================
 
     def line_detection(self, image):
         # =========== line detection code ===========
@@ -48,24 +68,9 @@ class Detector:
         processed_img = self.line_detection(cv_image)
         # ====================================
 
-        # Object detection ====================
-        #img_save_path = "../content/test/frame_images/frame.jpg"
-        #if os.path.exists(img_save_path):
-        #    os.remove(img_save_path)
-        #    print("Ready for new frame")
-        #cv2.imwrite(img_save_path, processed_img)
+        
 
-        #with torch.no_grad():
-            # update all models (to fix SourceChangeWarning)
-         #   if opt.update:
-          #      for opt.weights in ['yolov5s.pt', 'yolov5m.pt', 'yolov5l.pt', 'yolov5x.pt']:
-           #         final_img = detect(opt)
-            #        strip_optimizer(opt.weights)
-            #else:
-             #   final_img = detect(opt)
-        # ====================================
-
-        # Publishing
+        # Publisher section
         rospy.loginfo('Publishing image')
         self.pub.publish(bridge.cv2_to_imgmsg(processed_img, "bgr8"))
 
